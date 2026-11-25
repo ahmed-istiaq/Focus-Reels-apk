@@ -1,0 +1,122 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "User preferences, anti-addiction limits, prayer settings, and onboarding state.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "Authenticated Firebase Auth UID." },
+        "displayName": { "type": "string", "description": "Display name." },
+        "language": { "type": "string", "enum": ["en", "bn"], "description": "Selected UI language." },
+        "darkTheme": { "type": "boolean", "description": "Dark mode enabled." },
+        "onboardingCompleted": { "type": "boolean", "description": "Whether 3-step onboarding finished." },
+        "dailyLimitMinutes": { "type": "integer", "description": "Daily watch limit in minutes (5..120)." },
+        "endOfFeedVideoLimit": { "type": "integer", "description": "Optional max videos per session (0 = unlimited)." },
+        "pauseDuringPrayer": { "type": "boolean", "description": "Pause feed during prayer times." },
+        "cityName": { "type": "string", "description": "City name for prayer times." },
+        "latitude": { "type": "number", "description": "Latitude for astronomical prayer calculation." },
+        "longitude": { "type": "number", "description": "Longitude for astronomical prayer calculation." },
+        "selectedInterests": { "type": "array", "description": "User selected interest categories." },
+        "streakDays": { "type": "integer", "description": "Consecutive days staying under daily limit." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server timestamp on creation." },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Server timestamp on update." }
+      },
+      "required": ["userId", "displayName", "language", "darkTheme", "onboardingCompleted", "dailyLimitMinutes", "endOfFeedVideoLimit", "pauseDuringPrayer", "cityName", "latitude", "longitude", "selectedInterests", "streakDays", "createdAt", "updatedAt"]
+    },
+    "VideoSource": {
+      "title": "VideoSource",
+      "description": "A user-selected YouTube channel or Facebook page feeding Focus Reels.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "name": { "type": "string" },
+        "handleOrUrl": { "type": "string" },
+        "platform": { "type": "string", "enum": ["YOUTUBE", "FACEBOOK"] },
+        "category": { "type": "string", "enum": ["SELF_BUILDING", "MOTIVATION", "ISLAMIC", "OTHER"] },
+        "active": { "type": "boolean" },
+        "gradientIndex": { "type": "integer" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "name", "handleOrUrl", "platform", "category", "active", "gradientIndex", "createdAt", "updatedAt"]
+    },
+    "SavedVideo": {
+      "title": "SavedVideo",
+      "description": "Bookmarked video with folder category and user takeaway notes.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "videoId": { "type": "string" },
+        "title": { "type": "string" },
+        "channelName": { "type": "string" },
+        "platform": { "type": "string", "enum": ["YOUTUBE", "FACEBOOK"] },
+        "category": { "type": "string", "enum": ["SELF_BUILDING", "MOTIVATION", "ISLAMIC", "OTHER"] },
+        "youtubeVideoId": { "type": "string" },
+        "videoUrl": { "type": "string" },
+        "viewsCount": { "type": "integer" },
+        "likesCount": { "type": "integer" },
+        "durationSeconds": { "type": "integer" },
+        "note": { "type": "string" },
+        "gradientIndex": { "type": "integer" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "videoId", "title", "channelName", "platform", "category", "videoUrl", "viewsCount", "likesCount", "durationSeconds", "note", "gradientIndex", "createdAt", "updatedAt"]
+    },
+    "WatchHistoryEntry": {
+      "title": "WatchHistoryEntry",
+      "description": "Tracks watched, not-interested, and broken-reported videos to prevent 7-day repeats.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "videoId": { "type": "string" },
+        "watchedAtMillis": { "type": "integer" },
+        "notInterested": { "type": "boolean" },
+        "reported": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "videoId", "watchedAtMillis", "notInterested", "reported", "createdAt", "updatedAt"]
+    },
+    "DailyLog": {
+      "title": "DailyLog",
+      "description": "Daily watch time, videos watched, and 4 Islamic/self-growth habit completions.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "dateKey": { "type": "string" },
+        "watchedSeconds": { "type": "integer" },
+        "videosWatchedCount": { "type": "integer" },
+        "quranDone": { "type": "boolean" },
+        "prayerDone": { "type": "boolean" },
+        "learningDone": { "type": "boolean" },
+        "exerciseDone": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "dateKey", "watchedSeconds", "videosWatchedCount", "quranDone", "prayerDone", "learningDone", "exerciseDone", "createdAt", "updatedAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "User profile and anti-addiction settings."
+    },
+    "/users/{userId}/sources/{sourceId}": {
+      "schema": { "$ref": "#/entities/VideoSource" },
+      "description": "User-curated YouTube channels and Facebook pages."
+    },
+    "/users/{userId}/savedVideos/{savedId}": {
+      "schema": { "$ref": "#/entities/SavedVideo" },
+      "description": "Bookmarked videos with takeaway notes."
+    },
+    "/users/{userId}/watchHistory/{historyId}": {
+      "schema": { "$ref": "#/entities/WatchHistoryEntry" },
+      "description": "7-day repeat prevention and feedback log."
+    },
+    "/users/{userId}/dailyLogs/{dateKey}": {
+      "schema": { "$ref": "#/entities/DailyLog" },
+      "description": "Daily usage stats and habit completions."
+    }
+  }
+}

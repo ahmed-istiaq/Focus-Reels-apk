@@ -1,0 +1,6 @@
+{
+  "name": "Focus Reels",
+  "description": "An intentional short-video feed for self-improvement, motivation, and Islamic learning from user-chosen sources with anti-addiction limits and habit tracking.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

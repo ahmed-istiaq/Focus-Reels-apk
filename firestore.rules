@@ -1,0 +1,256 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Global default-deny safety net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidPlatform(p) {
+      return p in ['YOUTUBE', 'FACEBOOK'];
+    }
+
+    function isValidCategory(c) {
+      return c in ['SELF_BUILDING', 'MOTIVATION', 'ISLAMIC', 'OTHER'];
+    }
+
+    function isValidUserProfile(data, userId) {
+      return data.userId == userId &&
+             data.displayName is string && data.displayName.size() >= 1 && data.displayName.size() <= 80 &&
+             data.language in ['en', 'bn'] &&
+             data.darkTheme is bool &&
+             data.onboardingCompleted is bool &&
+             data.dailyLimitMinutes is int && data.dailyLimitMinutes >= 5 && data.dailyLimitMinutes <= 120 &&
+             data.endOfFeedVideoLimit is int && data.endOfFeedVideoLimit >= 0 && data.endOfFeedVideoLimit <= 50 &&
+             data.pauseDuringPrayer is bool &&
+             data.cityName is string && data.cityName.size() <= 60 &&
+             data.latitude is number && data.latitude >= -90.0 && data.latitude <= 90.0 &&
+             data.longitude is number && data.longitude >= -180.0 && data.longitude <= 180.0 &&
+             data.selectedInterests is list && data.selectedInterests.size() <= 10 &&
+             (data.selectedInterests.size() == 0 || data.selectedInterests[0] is string) &&
+             data.streakDays is int && data.streakDays >= 0 && data.streakDays <= 10000;
+    }
+
+    function isValidVideoSource(data, userId) {
+      return data.userId == userId &&
+             data.name is string && data.name.size() >= 1 && data.name.size() <= 100 &&
+             data.handleOrUrl is string && data.handleOrUrl.size() >= 1 && data.handleOrUrl.size() <= 300 &&
+             isValidPlatform(data.platform) &&
+             isValidCategory(data.category) &&
+             data.active is bool &&
+             data.gradientIndex is int && data.gradientIndex >= 0 && data.gradientIndex <= 10;
+    }
+
+    function isValidSavedVideo(data, userId) {
+      return data.userId == userId &&
+             data.videoId is string && data.videoId.size() >= 1 && data.videoId.size() <= 120 &&
+             data.title is string && data.title.size() >= 1 && data.title.size() <= 200 &&
+             data.channelName is string && data.channelName.size() >= 1 && data.channelName.size() <= 100 &&
+             isValidPlatform(data.platform) &&
+             isValidCategory(data.category) &&
+             (!('youtubeVideoId' in data) || (data.youtubeVideoId is string && data.youtubeVideoId.size() <= 32)) &&
+             data.videoUrl is string && data.videoUrl.size() <= 300 &&
+             data.viewsCount is int && data.viewsCount >= 0 &&
+             data.likesCount is int && data.likesCount >= 0 &&
+             data.durationSeconds is int && data.durationSeconds >= 1 && data.durationSeconds <= 3600 &&
+             data.note is string && data.note.size() <= 2000 &&
+             data.gradientIndex is int && data.gradientIndex >= 0 && data.gradientIndex <= 10;
+    }
+
+    function isValidWatchHistory(data, userId) {
+      return data.userId == userId &&
+             data.videoId is string && data.videoId.size() >= 1 && data.videoId.size() <= 120 &&
+             data.watchedAtMillis is int && data.watchedAtMillis >= 0 &&
+             data.notInterested is bool &&
+             data.reported is bool;
+    }
+
+    function isValidDailyLog(data, userId, dateKey) {
+      return data.userId == userId &&
+             data.dateKey == dateKey &&
+             data.dateKey is string && data.dateKey.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$') &&
+             data.watchedSeconds is int && data.watchedSeconds >= 0 && data.watchedSeconds <= 86400 &&
+             data.videosWatchedCount is int && data.videosWatchedCount >= 0 && data.videosWatchedCount <= 1000 &&
+             data.quranDone is bool &&
+             data.prayerDone is bool &&
+             data.learningDone is bool &&
+             data.exerciseDone is bool;
+    }
+
+    match /users/{userId} {
+      allow get: if isOwner(userId) && isValidId(userId);
+      allow list: if false;
+
+      allow create: if isOwner(userId) && isValidId(userId) &&
+        incoming().keys().hasAll([
+          'userId', 'displayName', 'language', 'darkTheme', 'onboardingCompleted',
+          'dailyLimitMinutes', 'endOfFeedVideoLimit', 'pauseDuringPrayer',
+          'cityName', 'latitude', 'longitude', 'selectedInterests', 'streakDays',
+          'createdAt', 'updatedAt'
+        ]) &&
+        incoming().keys().hasOnly([
+          'userId', 'displayName', 'language', 'darkTheme', 'onboardingCompleted',
+          'dailyLimitMinutes', 'endOfFeedVideoLimit', 'pauseDuringPrayer',
+          'cityName', 'latitude', 'longitude', 'selectedInterests', 'streakDays',
+          'createdAt', 'updatedAt'
+        ]) &&
+        incoming().createdAt is timestamp && incoming().createdAt <= request.time &&
+        incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
+        isValidUserProfile(incoming(), userId);
+
+      allow update: if isOwner(userId) && isValidId(userId) &&
+        isValidUserProfile(incoming(), userId) &&
+        incoming().userId == existing().userId &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
+        incoming().diff(existing()).affectedKeys().hasOnly([
+          'displayName', 'language', 'darkTheme', 'onboardingCompleted',
+          'dailyLimitMinutes', 'endOfFeedVideoLimit', 'pauseDuringPrayer',
+          'cityName', 'latitude', 'longitude', 'selectedInterests', 'streakDays',
+          'updatedAt'
+        ]);
+
+      allow delete: if isOwner(userId) && isValidId(userId);
+
+      match /sources/{sourceId} {
+        allow get: if isOwner(userId) && isValidId(sourceId);
+        allow list: if isOwner(userId);
+
+        allow create: if isOwner(userId) && isValidId(sourceId) &&
+          incoming().keys().hasAll([
+            'userId', 'name', 'handleOrUrl', 'platform', 'category',
+            'active', 'gradientIndex', 'createdAt', 'updatedAt'
+          ]) &&
+          incoming().keys().hasOnly([
+            'userId', 'name', 'handleOrUrl', 'platform', 'category',
+            'active', 'gradientIndex', 'createdAt', 'updatedAt'
+          ]) &&
+          incoming().createdAt is timestamp && incoming().createdAt <= request.time &&
+          incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
+          isValidVideoSource(incoming(), userId);
+
+        allow update: if isOwner(userId) && isValidId(sourceId) &&
+          isValidVideoSource(incoming(), userId) &&
+          incoming().userId == existing().userId &&
+          incoming().createdAt == existing().createdAt &&
+          incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
+          (
+            incoming().diff(existing()).affectedKeys().hasOnly(['active', 'updatedAt']) ||
+            incoming().diff(existing()).affectedKeys().hasOnly(['name', 'handleOrUrl', 'platform', 'category', 'active', 'updatedAt'])
+          );
+
+        allow delete: if isOwner(userId) && isValidId(sourceId);
+      }
+
+      match /savedVideos/{savedId} {
+        allow get: if isOwner(userId) && isValidId(savedId);
+        allow list: if isOwner(userId);
+
+        allow create: if isOwner(userId) && isValidId(savedId) &&
+          incoming().keys().hasAll([
+            'userId', 'videoId', 'title', 'channelName', 'platform', 'category',
+            'videoUrl', 'viewsCount', 'likesCount', 'durationSeconds', 'note',
+            'gradientIndex', 'createdAt', 'updatedAt'
+          ]) &&
+          incoming().keys().hasOnly([
+            'userId', 'videoId', 'title', 'channelName', 'platform', 'category',
+            'youtubeVideoId', 'videoUrl', 'viewsCount', 'likesCount', 'durationSeconds', 'note',
+            'gradientIndex', 'createdAt', 'updatedAt'
+          ]) &&
+          incoming().createdAt is timestamp && incoming().createdAt <= request.time &&
+          incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
+          isValidSavedVideo(incoming(), userId);
+
+        allow update: if isOwner(userId) && isValidId(savedId) &&
+          isValidSavedVideo(incoming(), userId) &&
+          incoming().userId == existing().userId &&
+          incoming().createdAt == existing().createdAt &&
+          incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
+          incoming().diff(existing()).affectedKeys().hasOnly(['note', 'category', 'updatedAt']);
+
+        allow delete: if isOwner(userId) && isValidId(savedId);
+      }
+
+      match /watchHistory/{historyId} {
+        allow get: if isOwner(userId) && isValidId(historyId);
+        allow list: if isOwner(userId);
+
+        allow create: if isOwner(userId) && isValidId(historyId) &&
+          incoming().keys().hasAll([
+            'userId', 'videoId', 'watchedAtMillis', 'notInterested', 'reported',
+            'createdAt', 'updatedAt'
+          ]) &&
+          incoming().keys().hasOnly([
+            'userId', 'videoId', 'watchedAtMillis', 'notInterested', 'reported',
+            'createdAt', 'updatedAt'
+          ]) &&
+          incoming().createdAt is timestamp && incoming().createdAt <= request.time &&
+          incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
+          isValidWatchHistory(incoming(), userId);
+
+        allow update: if isOwner(userId) && isValidId(historyId) &&
+          isValidWatchHistory(incoming(), userId) &&
+          incoming().userId == existing().userId &&
+          incoming().createdAt == existing().createdAt &&
+          incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
+          incoming().diff(existing()).affectedKeys().hasOnly(['watchedAtMillis', 'notInterested', 'reported', 'updatedAt']);
+
+        allow delete: if isOwner(userId) && isValidId(historyId);
+      }
+
+      match /dailyLogs/{dateKey} {
+        allow get: if isOwner(userId) && isValidId(dateKey);
+        allow list: if isOwner(userId);
+
+        allow create: if isOwner(userId) && isValidId(dateKey) &&
+          incoming().keys().hasAll([
+            'userId', 'dateKey', 'watchedSeconds', 'videosWatchedCount',
+            'quranDone', 'prayerDone', 'learningDone', 'exerciseDone',
+            'createdAt', 'updatedAt'
+          ]) &&
+          incoming().keys().hasOnly([
+            'userId', 'dateKey', 'watchedSeconds', 'videosWatchedCount',
+            'quranDone', 'prayerDone', 'learningDone', 'exerciseDone',
+            'createdAt', 'updatedAt'
+          ]) &&
+          incoming().createdAt is timestamp && incoming().createdAt <= request.time &&
+          incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
+          isValidDailyLog(incoming(), userId, dateKey);
+
+        allow update: if isOwner(userId) && isValidId(dateKey) &&
+          isValidDailyLog(incoming(), userId, dateKey) &&
+          incoming().userId == existing().userId &&
+          incoming().dateKey == existing().dateKey &&
+          incoming().createdAt == existing().createdAt &&
+          incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
+          incoming().diff(existing()).affectedKeys().hasOnly([
+            'watchedSeconds', 'videosWatchedCount',
+            'quranDone', 'prayerDone', 'learningDone', 'exerciseDone',
+            'updatedAt'
+          ]);
+
+        allow delete: if isOwner(userId) && isValidId(dateKey);
+      }
+    }
+  }
+}
